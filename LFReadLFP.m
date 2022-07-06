@@ -147,31 +147,31 @@ ExtraSections = LFPSections;
 
 % Default behaviour is to extract if ReadMetadataOnly is not passed
 if ~exist('ReadMetadataOnly', 'var') || ~ReadMetadataOnly
-%---unpack the image(s)---
-if( isfield( LFP, 'RawImg') )
-    LFP.ImgSize = [LFP.Metadata.image.width, LFP.Metadata.image.height];
-    switch( LFP.Metadata.camera.model )
-        case 'F01'
-            assert( LFP.Metadata.image.rawDetails.pixelPacking.bitsPerPixel == 12 );
-            assert( strcmp(LFP.Metadata.image.rawDetails.pixelPacking.endianness, 'big') );
-            LFP.RawImg = LFUnpackRawBuffer( LFP.RawImg, '12bit', LFP.ImgSize )';
-            LFP.DemosaicOrder = 'bggr';
-            
-        case 'ILLUM'
-            assert( LFP.Metadata.image.pixelPacking.bitsPerPixel == 10 );
-            assert( strcmp(LFP.Metadata.image.pixelPacking.endianness, 'little') );
-            LFP.RawImg = LFUnpackRawBuffer( LFP.RawImg, '10bit', LFP.ImgSize )';
-            if( isfield( LFP, 'WhiteImg' ) )
-                LFP.WhiteImg =  LFUnpackRawBuffer( LFP.WhiteImg, '10bit', LFP.ImgSize )'; 
-            end
-            LFP.DemosaicOrder = 'grbg';
-            
-        otherwise
-            warning('Unrecognized camera model');
-            return
+    %---unpack the image(s)---
+    if( isfield( LFP, 'RawImg') )
+        LFP.ImgSize = [LFP.Metadata.image.width, LFP.Metadata.image.height];
+        switch( LFP.Metadata.camera.model )
+            case 'F01'
+                assert( LFP.Metadata.image.rawDetails.pixelPacking.bitsPerPixel == 12 );
+                assert( strcmp(LFP.Metadata.image.rawDetails.pixelPacking.endianness, 'big') );
+                LFP.RawImg = LFUnpackRawBuffer( LFP.RawImg, '12bit', LFP.ImgSize )';
+                LFP.DemosaicOrder = 'bggr';
+                
+            case 'ILLUM'
+                assert( LFP.Metadata.image.pixelPacking.bitsPerPixel == 10 );
+                assert( strcmp(LFP.Metadata.image.pixelPacking.endianness, 'little') );
+                LFP.RawImg = LFUnpackRawBuffer( LFP.RawImg, '10bit', LFP.ImgSize )';
+                if( isfield( LFP, 'WhiteImg' ) )
+                    LFP.WhiteImg =  LFUnpackRawBuffer( LFP.WhiteImg, '10bit', LFP.ImgSize )'; 
+                end
+                LFP.DemosaicOrder = 'grbg';
+                
+            otherwise
+                warning('Unrecognized camera model');
+                return
+        end
     end
 end
-
 end
 
 % --------------------------------------------------------------------
