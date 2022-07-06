@@ -454,9 +454,10 @@ function LFUtilDecodeLytroFolder( InputPath, FileOptions, DecodeOptions, RectOpt
     end
     
     function [CachedIdx] = ComputeCache( LF, LFMetadata, RectOptions, LensletGridModel )
-        
+        sizeLF = size(LF);
+
         [CalInfo, RectOptions] = ValidateCalibration( LFMetadata, RectOptions, LensletGridModel, true );
-        CachedIdx = LFCalComputeIdx(size(LF), arrayfun(@(x)1:x, size(LF), 'UniformOutput', false), CalInfo, RectOptions);
+        CachedIdx = LFCalComputeIdx(size(LF), arrayfun(@(x)1:x, sizeLF(1:4), 'UniformOutput', false), CalInfo, RectOptions);
     end
     
     %---------------------------------------------------------------------------------------------------
@@ -465,11 +466,10 @@ function LFUtilDecodeLytroFolder( InputPath, FileOptions, DecodeOptions, RectOpt
         fprintf('Applying rectification... ');
     
         [CalInfo, RectOptions] = ValidateCalibration( LFMetadata, RectOptions, LensletGridModel, false );
-        RectOptions.CachedIdx = CachedIdx;
 
         %---Perform rectification---
         if (~isempty( CalInfo ))
-            [LF, RectOptions] = LFCalRectifyLF( LF, CalInfo, RectOptions );
+            [LF, RectOptions] = LFCalRectifyLF( LF, CalInfo, RectOptions, CachedIdx);
             Success = true;
         end
     end

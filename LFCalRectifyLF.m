@@ -51,12 +51,11 @@
 
 % Copyright (c) 2013-2020 Donald G. Dansereau
 
-function [LF, RectOptions] = LFCalRectifyLF(LF, CalInfo, RectOptions)
+function [LF, RectOptions] = LFCalRectifyLF(LF, CalInfo, RectOptions, CachedIdx)
 
     %---Defaults---
     RectOptions = LFDefaultField('RectOptions', 'MaxUBlkSize', 32);
     RectOptions = LFDefaultField('RectOptions', 'Precision', 'single');
-    RectOptions = LFDefaultField('RectOptions', 'CachedIdx', []);
     LFSize = size(LF);
 
     %---Build interpolation indices---
@@ -67,11 +66,11 @@ function [LF, RectOptions] = LFCalRectifyLF(LF, CalInfo, RectOptions)
 
     LFOut = LF;
     
-    if ~isempty(RectOptions.CachedIdx)
+    if exist('CachedIdx','var') && ~isempty(CachedIdx)
         % Use the cached index values
 
         % Interpolate the entire light field in one go
-        LFOut = InterpolateColours(LF, LFOut, RectOptions.CachedIdx, LFSize(1:4), 1:LFSize(4));
+        LFOut = InterpolateColours(LF, LFOut, CachedIdx, LFSize(1:4), 1:LFSize(4));
 
     else
         % Default option, recompute InterpIdx
