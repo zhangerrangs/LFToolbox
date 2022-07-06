@@ -17,8 +17,8 @@
 % Note that a calibration should only be applied to a light field decoded using the same lenslet
 % grid model. This is because the lenslet grid model forms an implicit part of the calibration,
 % and changing it will invalidate the calibration.
-% 
-% LFCalDispRectIntrinsics is useful for visualizing the sampling pattern associated with a requested 
+%
+% LFCalDispRectIntrinsics is useful for visualizing the sampling pattern associated with a requested
 % intrinsic matrix.
 %
 % Inputs:
@@ -51,60 +51,69 @@
 
 % Copyright (c) 2013-2020 Donald G. Dansereau
 
-function [LF, RectOptions] = LFCalRectifyLF( LF, CalInfo, RectOptions )
+function [LF, RectOptions] = LFCalRectifyLF(LF, CalInfo, RectOptions)
 
-%---Defaults---
-RectOptions = LFDefaultField( 'RectOptions', 'Precision', 'single' );
-RectOptions = LFDefaultField( 'RectOptions', 'NInverse_Distortion_Iters', 2 );
-RectOptions = LFDefaultField( 'RectOptions', 'MaxUBlkSize', 32 );
-LFSize = size(LF);
-RectOptions = LFDefaultField( 'RectOptions', 'RectCamIntrinsicsH', LFDefaultIntrinsics( LFSize, CalInfo ) );
+    %---Defaults---
+    RectOptions = LFDefaultField('RectOptions', 'MaxUBlkSize', 32);
+    RectOptions = LFDefaultField('RectOptions', 'Precision', 'single');
+    RectOptions = LFDefaultField('RectOptions', 'CachedIdx', []);
+    LFSize = size(LF);
 
-%---Build interpolation indices---
-fprintf('Generating interpolation indices...\n');
-NChans = LFSize(5);
-LF = cast(LF, RectOptions.Precision);
+    %---Build interpolation indices---
+    fprintf('Generating interpolation indices...\n');
+    LF = cast(LF, RectOptions.Precision);
 
-%---chop up the LF along u---
-fprintf('Interpolating...');
-UBlkSize = RectOptions.MaxUBlkSize;
-LFOut = LF;
-for( UStart = 1:UBlkSize:LFSize(4) )
-    UStop = UStart + UBlkSize - 1;
-    UStop = min(UStop, LFSize(4));
+    fprintf('Interpolating...');
+
+    LFOut = LF;
     
-    t_in=cast(1:LFSize(1), 'uint16'); % saving some mem by using uint16
-    s_in=cast(1:LFSize(2), 'uint16');
-    v_in=cast(1:LFSize(3), 'uint16');
-    u_in=cast(UStart:UStop, 'uint16');
-    [tt,ss,vv,uu] = ndgrid(t_in,s_in,v_in,u_in);
-    
-    % InterpIdx initially holds the index of the desired ray, and is evolved through the application
-    % of the inverse distortion model to eventually hold the continuous-domain index of the undistorted
-    % ray, and passed to the interpolation step.
-    InterpIdx = [ss(:)'; tt(:)'; uu(:)'; vv(:)'; ones(size(ss(:)'))];
-    DestSize = size(tt);
-    clear tt ss vv uu
-    
-    InterpIdx = LFMapRectifiedToMeasured( InterpIdx, CalInfo, RectOptions );
-    
-    for( ColChan = 1:NChans )
-        % todo[optimization]: use a weighted interpolation scheme to exploit the weight channel
-        InterpSlice = interpn(squeeze(LF(:,:,:,:,ColChan)), InterpIdx(2,:),InterpIdx(1,:), InterpIdx(4,:),InterpIdx(3,:), 'linear');
-        InterpSlice = reshape(InterpSlice, DestSize);
-        LFOut(:,:,:,UStart:UStop,ColChan) = InterpSlice;
+    if ~isempty(RectOptions.CachedIdx)
+        % Use the cached index values
+
+        % Interpolate the entire light field in one go
+        LFOut = InterpolateColours(LF, LFOut, RectOptions.CachedIdx, LFSize(1:4), 1:LFSize(4));
+
+    else
+        % Default option, recompute InterpIdx
+        UBlkSize = RectOptions.MaxUBlkSize;
+
+        %---chop up the LF along u---
+
+        for (UStart = 1:UBlkSize:LFSize(4))
+            UStop = UStart + UBlkSize - 1;
+            UStop = min(UStop, LFSize(4));
+            DestSize = [LFSize(1:3), length(UStart:UStop)];
+
+            % InterpIdx initially holds the index of the desired ray, and is evolved through the application
+            % of the inverse distortion model to eventually hold the continuous-domain index of the undistorted
+            % ray, and passed to the interpolation step.
+            LFOut = InterpolateColours(LF, LFOut, LFCalComputeIdx(LFSize, [arrayfun(@(x)1:x, LFSize(1:3), 'UniformOutput', false), ... 
+                UStart:UStop], CalInfo, RectOptions), DestSize, UStart:UStop);
+
+            fprintf('.')
+        end
+
     end
-    
-    fprintf('.')
-end
-LF = LFOut;
-clear LFOut;
 
-%---Clip interpolation result, which sometimes rings slightly out of range---
-LF(isnan(LF)) = 0;
-LF = max(0, min(1, LF));
+    LF = LFOut;
+    clear LFOut;
 
-fprintf('\nDone\n');
+    %---Clip interpolation result, which sometimes rings slightly out of range---
+    LF(isnan(LF)) = 0;
+    LF = max(0, min(1, LF));
 
+    fprintf('\nDone\n');
 end
 
+function LFOut = InterpolateColours(LF, LFOut, InterpIdx, DestSize, USlice)
+    LFSize = size(LF);
+    NChans = LFSize(5);
+
+    for (ColChan = 1:NChans)
+        % todo[optimization]: use a weighted interpolation scheme to exploit the weight channel
+        InterpSlice = interpn(squeeze(LF(:, :, :, :, ColChan)), InterpIdx(2, :), InterpIdx(1, :), InterpIdx(4, :), InterpIdx(3, :), 'linear');
+        InterpSlice = reshape(InterpSlice, DestSize);
+        LFOut(:, :, :, USlice, ColChan) = InterpSlice;
+    end
+
+end
