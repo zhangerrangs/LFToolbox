@@ -51,9 +51,9 @@ end
 
 LFSize = size(LF);
 
-RectOptions = LFDefaultField( 'RectOptions', 'Precision', 'single' );
-RectOptions = LFDefaultField( 'RectOptions', 'NInverse_Distortion_Iters', 2 );
-RectOptions = LFDefaultField( 'RectOptions', 'RectCamIntrinsicsH', LFDefaultIntrinsics( LFSize, CalInfo ) );
+%RectOptions = LFDefaultField( 'RectOptions', 'Precision', 'single' );
+%RectOptions = LFDefaultField( 'RectOptions', 'NInverse_Distortion_Iters', 2 );
+%RectOptions = LFDefaultField( 'RectOptions', 'RectCamIntrinsicsH', LFDefaultIntrinsics( LFSize, CalInfo ) );
 
 if( isempty( CalInfo ) )
     warning('No suitable calibration found, skipping');
@@ -61,13 +61,17 @@ if( isempty( CalInfo ) )
 end
 
 %--- visualize image utilization---
-t_in=cast(1:LFSize(1), 'uint16');
-s_in=cast(1:LFSize(2), 'uint16');
-v_in=cast(1:10:LFSize(3), 'uint16');
-u_in=cast(1:10:LFSize(4), 'uint16');
-[tt,ss,vv,uu] = ndgrid(t_in,s_in,v_in,u_in);
-InterpIdx = [ss(:)'; tt(:)'; uu(:)'; vv(:)'; ones(size(ss(:)'))];
-InterpIdx = LFMapRectifiedToMeasured( InterpIdx, CalInfo, RectOptions );
+% Can refactor this using calculate idx
+%t_in=cast(1:LFSize(1), 'uint16');
+%s_in=cast(1:LFSize(2), 'uint16');
+%v_in=cast(1:10:LFSize(3), 'uint16');
+%u_in=cast(1:10:LFSize(4), 'uint16');
+%[tt,ss,vv,uu] = ndgrid(t_in,s_in,v_in,u_in);
+%InterpIdx = [ss(:)'; tt(:)'; uu(:)'; vv(:)'; ones(size(ss(:)'))];
+%InterpIdx = LFMapRectifiedToMeasured( InterpIdx, CalInfo, RectOptions );
+%InterpIdx = round(double(InterpIdx));
+
+InterpIdx = LFCalComputeIdx(LFSize, {1:LFSize(1), 1:LFSize(2), 1:10:LFSize(3), 1:10:LFSize(4)}, CalInfo, RectOptions);
 InterpIdx = round(double(InterpIdx));
 
 PaintVal = cast(double(max(LF(:))).*PaintColour, 'like', LF);
