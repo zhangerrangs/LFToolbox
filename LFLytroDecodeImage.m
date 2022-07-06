@@ -69,13 +69,10 @@ function [LF, LFMetadata, WhiteImageMetadata, LensletGridModel, DecodeOptions] =
 DecodeOptions = LFDefaultField( 'DecodeOptions', 'WhiteProcDataFnameExtension', '.grid.json' );
 DecodeOptions = LFDefaultField( 'DecodeOptions', 'WhiteRawDataFnameExtension', '.RAW' );
 DecodeOptions = LFDefaultField( 'DecodeOptions', 'WhiteImageDatabasePath', fullfile('Cameras','WhiteImageDatabase.mat'));
-% Compatibility: for loading extracted raw / json files
-DecodeOptions = LFDefaultField( 'DecodeOptions', 'MetadataFnamePattern', '_metadata.json' );
-DecodeOptions = LFDefaultField( 'DecodeOptions', 'SerialdataFnamePattern', '_private_metadata.json' );
 
 %---
 LF = [];
-LFMetadata = [];
+LFMetadata = LFLytroExtractMetadata(InputFname);
 WhiteImageMetadata = [];
 LensletGridModel = [];
 
@@ -83,12 +80,7 @@ LensletGridModel = [];
 FileExtension = InputFname(end-2:end);
 switch( lower(FileExtension) )
     case 'raw' %---Load raw light field and metadata---
-        FNameBase = InputFname(1:end-4);
-        MetadataFname = [FNameBase, DecodeOptions.MetadataFnamePattern];
-        SerialdataFname = [FNameBase, DecodeOptions.SerialdataFnamePattern];
         fprintf('Loading lenslet image and metadata:\n\t%s\n', InputFname);
-        LFMetadata = LFReadMetadata(MetadataFname);
-        LFMetadata.SerialData = LFReadMetadata(SerialdataFname);
         
         switch( LFMetadata.camera.model )
             case 'F01'
@@ -107,8 +99,6 @@ switch( lower(FileExtension) )
             fprintf('No light field image found, skipping...\n');
             return
         end
-        LFMetadata = LFP.Metadata;
-        LFMetadata.SerialData = LFP.Serials;
         LensletImage = LFP.RawImg;
         DecodeOptions.DemosaicOrder = LFP.DemosaicOrder;
 end
