@@ -25,7 +25,7 @@
 
 % Copyright (c) 2013-2020 Donald G. Dansereau
 
-function [CalInfo, RectOptions] = LFFindCalInfo( LFMetadata, RectOptions )
+function [CalInfo, RectOptions] = LFFindCalInfo( LFMetadata, RectOptions, SuppressMessages )
 
 CalInfo = [];
 
@@ -41,6 +41,9 @@ end
 PathToDatabase = fileparts( RectOptions.CalibrationDatabaseFname );
 RectOptions.CalInfoFname = CalFileInfo.Fname;
 CalInfo = LFReadMetadata( fullfile(PathToDatabase, RectOptions.CalInfoFname) );
+
+% If SuppressMessages is not passed then default behaviour is to show messages
+if ~exist('SuppressMessages','var') || ~SuppressMessages
 fprintf('Loading %s\n', RectOptions.CalInfoFname);
 
 %---Check that the decode options and calibration info are a good match---
@@ -55,5 +58,6 @@ end
 if( CalInfo.CamInfo.ZoomStep ~= LFMetadata.devices.lens.zoomStep || ...
         CalInfo.CamInfo.FocusStep ~= LFMetadata.devices.lens.focusStep )
     warning('Zoom / focus mismatch -- for significant deviations rectification may be invalid.');
+end    
 end
 
