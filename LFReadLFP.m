@@ -43,7 +43,7 @@
 
 % Copyright (c) 2013-2020 Donald G. Dansereau
 
-function [LFP, ExtraSections] = LFReadLFP( Fname )
+function [LFP, ExtraSections] = LFReadLFP(Fname, ReadMetadataOnly)
 
 %---Consts---
 LFPConsts.LFPHeader = hex2dec({'89', '4C', '46', '50', '0D', '0A', '1A', '0A', '00', '00', '00', '01'}); % 12-byte LFPSections header
@@ -145,6 +145,8 @@ for( iSect = 1:size(KnownSectionTypes,1) )
 end
 ExtraSections = LFPSections;
 
+% Default behaviour is to extract if ReadMetadataOnly is not passed
+if ~exist('ReadMetadataOnly', 'var') || ~ReadMetadataOnly
 %---unpack the image(s)---
 if( isfield( LFP, 'RawImg') )
     LFP.ImgSize = [LFP.Metadata.image.width, LFP.Metadata.image.height];
