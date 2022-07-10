@@ -107,6 +107,69 @@ if( length(RenderOptions.BorderColor) < NChans )
 	RenderOptions.BorderColor = RenderOptions.BorderColor .* ones(1,NChans);
 end
 
+function [ImgW, ImgH] = ImageDimensions(DimXOuter, DimXInner, DimYOuter, DimYInner)
+	ImgW = DimXOuter*DimXInner+(DimXOuter+1)*RenderOptions.BorderSize;
+	ImgH = DimYOuter*DimYInner+(DimYOuter+1)*RenderOptions.BorderSize;
+end
+
+function [Img] = SetBackground(Img)
+	for( i=1:NChans )
+		Img(:,:,i) = RenderOptions.BorderColor(i);
+	end
+end
+
+function [Img] = DrawTiles(Img, DimXOuter, DimXInner, DimYOuter, DimYInner, LFSliceF)
+	for( dY=1:DimYOuter )
+		for( dX=1:DimXOuter )
+			for( c=1:NChans )
+				Img( (dY-1)*(DimYInner+RenderOptions.BorderSize)+RenderOptions.BorderSize + (1:DimYInner), ...
+					(dX-1)*(DimXInner+RenderOptions.BorderSize)+RenderOptions.BorderSize + (1:DimXInner), c) = LFSliceF(dX,dY,c);
+			end
+		end
+	end
+end
+
+function [XAxisLabel, YAxisLabel, XTickLabels, YTickLabels] = SetLabels(DimOrder, SampGridDim1, SampGridDim2)
+	XAxisLabel = DimOrder(1);
+	YAxisLabel = DimOrder(2);
+	XTickLabels= SampGridDim1;
+	YTickLabels= SampGridDim2;
+end
+
+function [XTicks, YTicks] = SetTicks(DimXOuter, DimXInner, DimYOuter, DimYInner)
+	XTicks = (0:DimXOuter-1).*(DimXInner+RenderOptions.BorderSize) + (ceil(DimXInner/2)+RenderOptions.BorderSize) + 1;
+	YTicks = (0:DimYOuter-1).*(DimYInner+RenderOptions.BorderSize) + (ceil(DimYInner/2)+RenderOptions.BorderSize) + 1;
+end
+
+function CreateTileFigure(DimOrder, DimXOuter, DimXInner, DimYOuter, DimYInner, SampGridDim1, SampGridDim2,LFSliceF)
+	[ImgW, ImgH] = ImageDimensions(DimXOuter, DimXInner, DimYOuter, DimYInner);
+	Img = zeros( ImgH, ImgW, NChans, 'like',LF );
+	[Img] = SetBackground(Img);
+	[Img] = DrawTiles(Img, DimXOuter, DimXInner, DimYOuter, DimYInner, LFSliceF);
+	[XTicks, YTicks] = SetTicks(DimXOuter,DimXInner,DimYOuter,DimYInner);
+	[XAxisLabel, YAxisLabel, XTickLabels, YTickLabels] = SetLabels(DimOrder, SampGridDim1, SampGridDim2);
+end
+
+% Have not tested this throughly
+switch lower(DimOrder)
+	case 'sutv'
+		CreateTileFigure(DimOrder,SSize,TSize,USize,VSize,SampGrid.SVec,SampGrid.UVec,@(s,u,c)squeeze(LF(:,s,:,u,c))');
+	case 'tvsu'
+		CreateTileFigure(DimOrder,TSize,SSize,VSize,USize,SampGrid.TVec,SampGrid.VVec,@(t,v,c)squeeze(LF(t,:,v,:,c))');
+	case 'stuv'
+		% Redundent squeeze here
+		CreateTileFigure(DimOrder,SSize,USize,TSize,VSize,SampGrid.SVec,SampGrid.TVec,@(s,t,c)squeeze(LF(t,s,:,:,c))');
+	case 'uvst'
+		% Redundent squeeze here
+		CreateTileFigure(DimOrder,USize,SSize,VSize,TSize,SampGrid.UVec,SampGrid.VVec,@(u,v,c)squeeze(LF(:,:,v,u,c))');
+	case 'svtu'
+		CreateTileFigure(DimOrder,SSize,TSize,VSize,USize,SampGrid.SVec,SampGrid.VVec,@(s,v,c)squeeze(LF(:,s,v,:,c))');
+	case 'tusv'
+		CreateTileFigure(DimOrder,TSize,SSize,USize,VSize,SampGrid.TVec,SampGrid.UVec,@(t,u,c)squeeze(LF(t,:,:,u,c))')
+	end
+
+
+%{
 switch lower(DimOrder)
 	case 'sutv'
 		ImgW = SSize*TSize+(SSize+1)*RenderOptions.BorderSize;
@@ -243,6 +306,7 @@ switch lower(DimOrder)
 		YTickLabels=SampGrid.UVec;
 		
 end
+%}
 
 %---Display-----------------------------------------------------------------------------------------
 if( nargout < 1 )
@@ -257,4 +321,5 @@ if( nargout < 1 )
 	set(gca,'yticklabel', YTickLabels);
 	
 	clear Img
+end
 end
