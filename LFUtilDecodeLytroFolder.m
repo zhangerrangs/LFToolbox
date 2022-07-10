@@ -142,7 +142,7 @@ function LFUtilDecodeLytroFolder( InputPath, FileOptions, DecodeOptions, RectOpt
     RectOptions = LFDefaultField( 'RectOptions', 'MaxGridModelDiff', 1e-5 );
 
     % Not sure whether to leave this as the default
-    RectOptions = LFDefaultField( 'RectOptions', 'CacheIdx', true );
+    RectOptions = LFDefaultField( 'RectOptions', 'CacheIdx', false );
     
     % Massage a single-element OptionalTasks list to behave as a cell array
     while( ~iscell(DecodeOptions.OptionalTasks) )
@@ -427,9 +427,8 @@ function LFUtilDecodeLytroFolder( InputPath, FileOptions, DecodeOptions, RectOpt
     end
     
     %---------------------------------------------------------------------------------------------------
-    function [CalInfo, RectOptions] = ValidateCalibration( LFMetadata, RectOptions, LensletGridModel, SuppressMessages)
-        % May be better to split into two functions
 
+    function [CalInfo, RectOptions] = SelectCalibration(LFMetadata, RectOptions, SuppressMessages)
         %---Load cal info---
         fprintf('Selecting calibration...\n');
         
@@ -438,9 +437,13 @@ function LFUtilDecodeLytroFolder( InputPath, FileOptions, DecodeOptions, RectOpt
             warning('No suitable calibration found, skipping');
             return;
         end
+    end
 
+    function [Success] = ValidateCalibration( CalInfo, RectOptions, LensletGridModel)
         % Fails if both are vertical orientation!
         %---Compare structs
+        Success = true;
+
         a = CalInfo.LensletGridModel;
         b = LensletGridModel;
         a.Orientation = double(strcmp(a.Orientation, 'horz'));
@@ -449,14 +452,18 @@ function LFUtilDecodeLytroFolder( InputPath, FileOptions, DecodeOptions, RectOpt
         if( ~all( FractionalDiff < RectOptions.MaxGridModelDiff ) )
             warning(['Lenslet grid models differ -- ideally the same grid model and white image are ' ...
                 ' used to decode during calibration and rectification']);
+            Success = false;
         end
-
     end
     
     function [CachedIdx] = ComputeCache( LF, LFMetadata, RectOptions, LensletGridModel )
         sizeLF = size(LF);
 
-        [CalInfo, RectOptions] = ValidateCalibration( LFMetadata, RectOptions, LensletGridModel, true );
+        [CalInfo, RectOptions] = SelectCalibration(LFMetadata, RectOptions, true);
+        if ~isempty(CalInfo)
+            ValidateCalibration( CalInfo, RectOptions, LensletGridModel );
+        end
+
         CachedIdx = LFCalComputeIdx(size(LF), arrayfun(@(x)1:x, sizeLF(1:4), 'UniformOutput', false), CalInfo, RectOptions);
     end
     
@@ -465,10 +472,11 @@ function LFUtilDecodeLytroFolder( InputPath, FileOptions, DecodeOptions, RectOpt
         Success = false;
         fprintf('Applying rectification... ');
     
-        [CalInfo, RectOptions] = ValidateCalibration( LFMetadata, RectOptions, LensletGridModel, false );
+        [CalInfo, RectOptions] = SelectCalibration(LFMetadata, RectOptions, false);
 
         %---Perform rectification---
         if (~isempty( CalInfo ))
+            ValidateCalibration( CalInfo, RectOptions, LensletGridModel );
             [LF, RectOptions] = LFCalRectifyLF( LF, CalInfo, RectOptions, CachedIdx);
             Success = true;
         end
