@@ -63,10 +63,10 @@ function [LF, RectOptions] = LFCalRectifyLF(LF, CalInfo, RectOptions, CachedIdx)
     LF = cast(LF, RectOptions.Precision);
 
     fprintf('Interpolating...');
-
+    tStart = cputime;
     LFOut = LF;
-    
-    if exist('CachedIdx','var') && ~isempty(CachedIdx)
+
+    if exist('CachedIdx', 'var') && ~isempty(CachedIdx)
         % Use the cached index values
 
         % Interpolate the entire light field in one go
@@ -86,8 +86,8 @@ function [LF, RectOptions] = LFCalRectifyLF(LF, CalInfo, RectOptions, CachedIdx)
             % InterpIdx initially holds the index of the desired ray, and is evolved through the application
             % of the inverse distortion model to eventually hold the continuous-domain index of the undistorted
             % ray, and passed to the interpolation step.
-            LFOut = InterpolateColours(LF, LFOut, LFCalComputeIdx(LFSize, [arrayfun(@(x)1:x, LFSize(1:3), 'UniformOutput', false), ... 
-                UStart:UStop], CalInfo, RectOptions), DestSize, UStart:UStop);
+            LFOut = InterpolateColours(LF, LFOut, LFCalComputeIdx(LFSize, [arrayfun(@(x)1:x, LFSize(1:3), 'UniformOutput', false), ...
+                                                                        UStart:UStop], CalInfo, RectOptions), DestSize, UStart:UStop);
 
             fprintf('.')
         end
@@ -101,18 +101,79 @@ function [LF, RectOptions] = LFCalRectifyLF(LF, CalInfo, RectOptions, CachedIdx)
     LF(isnan(LF)) = 0;
     LF = max(0, min(1, LF));
 
-    fprintf('\nDone\n');
+    fprintf('\nDone. Interpolation took %.2f seconds.\n', cputime - tStart);
 end
 
 function LFOut = InterpolateColours(LF, LFOut, InterpIdx, DestSize, USlice)
     LFSize = size(LF);
     NChans = LFSize(5);
 
-    for (ColChan = 1:NChans)
-        % todo[optimization]: use a weighted interpolation scheme to exploit the weight channel
-        InterpSlice = interpn(squeeze(LF(:, :, :, :, ColChan)), InterpIdx(2, :), InterpIdx(1, :), InterpIdx(4, :), InterpIdx(3, :), 'linear');
-        InterpSlice = reshape(InterpSlice, DestSize);
-        LFOut(:, :, :, USlice, ColChan) = InterpSlice;
-    end
+    %{
+        InterpIdx = min(LFSize(1:4)' - 1, max(1, InterpIdx));
+
+        for (ColChan = 1:NChans)
+            S0 = floor(InterpIdx(2,:));
+            T0 = floor(InterpIdx(1,:));
+            U0 = floor(InterpIdx(4,:));
+            V0 = floor(InterpIdx(3,:));
+
+            S1 = S0 + 1;
+            T1 = T0 + 1;
+            U1 = U0 + 1;
+            V1 = V0 + 1;
+
+            % May be able to use fixed point numbers and bit masking to achieve faster performance
+            Sd = InterpIdx(2,:) - S0;
+            Td = InterpIdx(1,:) - T0;
+            Ud = InterpIdx(4,:) - U0;
+            Vd = InterpIdx(3,:) - V0;
+
+            GetLF = @(S, T, U, V, ColChan) LF(sub2ind(LFSize, S, T, U, V, repmat(ColChan, size(S))));
+
+            c000 = GetLF(S0, T0, U0, V0, ColChan) .* (1 - Sd) + GetLF(S1, T0, U0, V0, ColChan) .* Sd;
+            c001 = GetLF(S0, T0, U0, V1, ColChan) .* (1 - Sd) + GetLF(S1, T0, U0, V1, ColChan) .* Sd;
+            c010 = GetLF(S0, T0, U1, V0, ColChan) .* (1 - Sd) + GetLF(S1, T0, U1, V0, ColChan) .* Sd;
+            c011 = GetLF(S0, T0, U1, V1, ColChan) .* (1 - Sd) + GetLF(S1, T0, U1, V1, ColChan) .* Sd;
+            c100 = GetLF(S0, T1, U0, V0, ColChan) .* (1 - Sd) + GetLF(S1, T1, U0, V0, ColChan) .* Sd;
+            c101 = GetLF(S0, T1, U0, V1, ColChan) .* (1 - Sd) + GetLF(S1, T1, U0, V1, ColChan) .* Sd;
+            c110 = GetLF(S0, T1, U1, V0, ColChan) .* (1 - Sd) + GetLF(S1, T1, U1, V0, ColChan) .* Sd;
+            c111 = GetLF(S0, T1, U1, V1, ColChan) .* (1 - Sd) + GetLF(S1, T1, U1, V1, ColChan) .* Sd;
+
+            c00 = c000 .* (1 - Td) + c100 .* Td;
+            c01 = c001 .* (1 - Td) + c101 .* Td;
+            c10 = c010 .* (1 - Td) + c110 .* Td;
+            c11 = c011 .* (1 - Td) + c111 .* Td;
+
+            c0 = c00 .* (1 - Ud) + c10 .* Ud;
+            c1 = c01 .* (1 - Ud) + c11 .* Ud;
+
+            c = c0 .* (1 - Vd) + c1 .* Vd;
+
+            LFOut(:, :, :, :, ColChan) = reshape(c, LFSize(1:4));
+        end
+    %}
+
+    % todo[optimization]: use a weighted interpolation scheme to exploit the weight channel
+
+    % Interpolating all the channels at once is not much faster than doing it 1 by 1.
+    F = griddedInterpolant(arrayfun(@(x)(1:x)', LFSize(1:4), 'UniformOutput', false), LF, 'linear', 'none');
+    LFOut(:, :, :, USlice, :) = reshape(F(InterpIdx(2, :)', InterpIdx(1, :)', InterpIdx(4, :)', InterpIdx(3, :)'), [DestSize, NChans]);
+
+    %for (ColChan = 1:NChans)
+
+    %F = griddedInterpolant(arrayfun(@(x)(1:x)', LFSize(1:4), 'UniformOutput', false), LF, 'linear', 'none');
+    %InterpSlice = F(InterpIdx(2, :)', InterpIdx(1, :)', InterpIdx(4, :)', InterpIdx(3, :)');
+
+    %InterpSlice = interpn(squeeze(LF(:, :, :, :, ColChan)), InterpIdx(2, :), InterpIdx(1, :), InterpIdx(4, :), InterpIdx(3, :), 'linear');
+    %InterpSlice = zeros(1, length(InterpIdx));
+    %InterpIdx = min(LFSize(1:4)', max(1, round(InterpIdx)));
+    %InterpSlice = LF(sub2ind(LFSize, InterpIdx(2, :), InterpIdx(1, :), InterpIdx(4, :), InterpIdx(3, :), repmat(ColChan, 1, length(InterpIdx))));
+    %for col = 1:length(InterpIdx)
+    %    InterpSlice(col) = LF(InterpIdx(2, col), InterpIdx(1, col), InterpIdx(4, col), InterpIdx(3, col), ColChan);
+    %end
+
+    %InterpSlice = reshape(InterpSlice, LFSize);
+    %LFOut(:, :, :, USlice, :) = InterpSlice;
+    %end
 
 end
