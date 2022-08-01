@@ -82,12 +82,13 @@ function [LF, RectOptions] = LFCalRectifyLF(LF, CalInfo, RectOptions, CachedIdx)
             UStop = UStart + UBlkSize - 1;
             UStop = min(UStop, LFSize(4));
             DestSize = [LFSize(1:3), length(UStart:UStop)];
-
+            
             % InterpIdx initially holds the index of the desired ray, and is evolved through the application
             % of the inverse distortion model to eventually hold the continuous-domain index of the undistorted
             % ray, and passed to the interpolation step.
-            LFOut = InterpolateColours(LF, LFOut, LFCalComputeIdx(LFSize, [arrayfun(@(x)1:x, LFSize(1:3), 'UniformOutput', false), ...
-                                                                        UStart:UStop], CalInfo, RectOptions), DestSize, UStart:UStop);
+            [InterpIdx, RectOptions] = LFCalComputeIdx(LFSize, [arrayfun(@(x)1:x, LFSize(1:3), 'UniformOutput', false), UStart:UStop], ...
+                CalInfo, RectOptions);
+            LFOut = InterpolateColours(LF, LFOut, InterpIdx, DestSize, UStart:UStop);
 
             fprintf('.')
         end
@@ -101,7 +102,7 @@ function [LF, RectOptions] = LFCalRectifyLF(LF, CalInfo, RectOptions, CachedIdx)
     LF(isnan(LF)) = 0;
     LF = max(0, min(1, LF));
 
-    fprintf('\nDone. Interpolation took %.2f seconds.\n', cputime - tStart);
+    fprintf('\nDone. Interpolation took %.2f CPU seconds.\n', cputime - tStart);
 end
 
 function LFOut = InterpolateColours(LF, LFOut, InterpIdx, DestSize, USlice)
@@ -122,7 +123,6 @@ function LFOut = InterpolateColours(LF, LFOut, InterpIdx, DestSize, USlice)
             U1 = U0 + 1;
             V1 = V0 + 1;
 
-            % May be able to use fixed point numbers and bit masking to achieve faster performance
             Sd = InterpIdx(2,:) - S0;
             Td = InterpIdx(1,:) - T0;
             Ud = InterpIdx(4,:) - U0;
@@ -155,10 +155,13 @@ function LFOut = InterpolateColours(LF, LFOut, InterpIdx, DestSize, USlice)
 
     % todo[optimization]: use a weighted interpolation scheme to exploit the weight channel
 
+    % Using custom implentation of GriddedInterpolant may be faster. Custom interp1d exists on file exchange that
+    % can be faster than interp1d and by using mex.
+
     % Interpolating all the channels at once is not much faster than doing it 1 by 1.
     F = griddedInterpolant(arrayfun(@(x)(1:x)', LFSize(1:4), 'UniformOutput', false), LF, 'linear', 'none');
     LFOut(:, :, :, USlice, :) = reshape(F(InterpIdx(2, :)', InterpIdx(1, :)', InterpIdx(4, :)', InterpIdx(3, :)'), [DestSize, NChans]);
-
+    
     %for (ColChan = 1:NChans)
 
     %F = griddedInterpolant(arrayfun(@(x)(1:x)', LFSize(1:4), 'UniformOutput', false), LF, 'linear', 'none');

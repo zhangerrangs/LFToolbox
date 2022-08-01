@@ -1,4 +1,4 @@
-function [InterpIdx] = LFCalComputeIdx(LFSize, IdxSize, CalInfo, RectOptions)
+function [InterpIdx, RectOptions] = LFCalComputeIdx(LFSize, IdxSize, CalInfo, RectOptions)
     assert(length(IdxSize) == 4, 'Incorrect dimensions for IdxSize. Should be a 4 length row vector.')
 
     RectOptions = LFDefaultField('RectOptions', 'RectCamIntrinsicsH', LFDefaultIntrinsics(LFSize, CalInfo));
@@ -12,5 +12,5 @@ function [InterpIdx] = LFCalComputeIdx(LFSize, IdxSize, CalInfo, RectOptions)
 
     InterpIdx = [ss(:)'; tt(:)'; uu(:)'; vv(:)'; ones(size(ss(:)'))];
 
-    InterpIdx = LFMapRectifiedToMeasured(InterpIdx, CalInfo, RectOptions);
+    [InterpIdx, RectOptions] = LFMapRectifiedToMeasured(InterpIdx, CalInfo, RectOptions);
 end

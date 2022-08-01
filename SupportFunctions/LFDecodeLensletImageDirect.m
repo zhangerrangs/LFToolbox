@@ -288,48 +288,45 @@ TSize = MaxSpacing + 1;
 
 LF = zeros(TSize, SSize, VSize, USize, DecodeOptions.NColChans + DecodeOptions.NWeightChans, DecodeOptions.Precision);
 
-for( chan=1:4 )
-	Interpolant{chan} = griddedInterpolant( LensletImage(:,:,chan) );
-	Interpolant{chan}.Method = 'linear';
-	Interpolant{chan}.ExtrapolationMethod = 'none';
-end
-
 TVec = cast(floor((-(TSize-1)/2):((TSize-1)/2)), 'int16');
 SVec = cast(floor((-(SSize-1)/2):((SSize-1)/2)), 'int16');
 VVec = cast(0:VSize-1, 'int16');
 UBlkSize = 32;
-for( UStart = 0:UBlkSize:USize-1 )  % note zero-based indexing
-    UStop = UStart + UBlkSize - 1;
-    UStop = min(UStop, USize-1);  
-    UVec = cast(UStart:UStop, 'int16');
-    
-    [tt,ss,vv,uu] = ndgrid( TVec, SVec, VVec, UVec );
-    
-    %---Build indices into 2D image---
-    LFSliceIdxX = LensletGridModel.HOffset + uu.*LensletGridModel.HSpacing + ss;
-    LFSliceIdxY = LensletGridModel.VOffset + vv.*LensletGridModel.VSpacing + tt;
-    
-    HexShiftStart = LensletGridModel.FirstPosShiftRow;
-    LFSliceIdxX(:,:,HexShiftStart:2:end,:) = LFSliceIdxX(:,:,HexShiftStart:2:end,:) + LensletGridModel.HSpacing/2;
 
-    %---Lenslet mask in s,t and clip at image edges---
-    CurSTAspect = DecodeOptions.OutputScale(1)/DecodeOptions.OutputScale(2);
-    R = sqrt((cast(tt,DecodeOptions.Precision)*CurSTAspect).^2 + cast(ss,DecodeOptions.Precision).^2);
-    
-    %---try going back to uncorrected lenslet img---
-    ImCoords = double([LFSliceIdxX(:), LFSliceIdxY(:), ones(size(LFSliceIdxX(:)))]);
-    ImCoords = (ImXform'^-1) * ImCoords';
-	ImCoords = ImCoords([2,1],:)';
+for( chan=1:4 )
+	Interpolant = griddedInterpolant( LensletImage(:,:,chan) );
+	Interpolant.Method = 'linear';
+	Interpolant.ExtrapolationMethod = 'none';
+    for( UStart = 0:UBlkSize:USize-1 )  % note zero-based indexing
+        UStop = UStart + UBlkSize - 1;
+        UStop = min(UStop, USize-1);  
+        UVec = cast(UStart:UStop, 'int16');
+        
+        [tt,ss,vv,uu] = ndgrid( TVec, SVec, VVec, UVec );
+        
+        %---Build indices into 2D image---
+        LFSliceIdxX = LensletGridModel.HOffset + uu.*LensletGridModel.HSpacing + ss;
+        LFSliceIdxY = LensletGridModel.VOffset + vv.*LensletGridModel.VSpacing + tt;
+        
+        HexShiftStart = LensletGridModel.FirstPosShiftRow;
+        LFSliceIdxX(:,:,HexShiftStart:2:end,:) = LFSliceIdxX(:,:,HexShiftStart:2:end,:) + LensletGridModel.HSpacing/2;
 
-    InValidIdx = find(R >= LensletGridModel.HSpacing/2  );
+        %---Lenslet mask in s,t and clip at image edges---
+        CurSTAspect = DecodeOptions.OutputScale(1)/DecodeOptions.OutputScale(2);
+        R = sqrt((cast(tt,DecodeOptions.Precision)*CurSTAspect).^2 + cast(ss,DecodeOptions.Precision).^2);
+        
+        %---try going back to uncorrected lenslet img---
+        ImCoords = double([LFSliceIdxX(:), LFSliceIdxY(:), ones(size(LFSliceIdxX(:)))]);
+        ImCoords = (ImXform'^-1) * ImCoords';
+        ImCoords = ImCoords([2,1],:)';
 
-    for( ColChan=1:4 )
-		IDirect = Interpolant{ColChan}( ImCoords );
+        InValidIdx = find(R >= LensletGridModel.HSpacing/2  );
+
+        IDirect = Interpolant( ImCoords );
         IDirect(isnan(IDirect)) = 0;
         IDirect(InValidIdx) = 0;
-        LF(:,:,:,1 + (UStart:UStop),ColChan) = reshape(IDirect, size(ss));
-	end
-        
+        LF(:,:,:,1 + (UStart:UStop),chan) = reshape(IDirect, size(ss));
+    end
     fprintf('.');
 end
 end

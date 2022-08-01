@@ -36,14 +36,13 @@ function LF = LFColourCorrect(LF, ColMatrix, ColBalance, Gamma)
 LFSize = size(LF);
 
 % Flatten input to a flat list of RGB triplets
-NDims = numel(LFSize);
-LF = reshape(LF, [prod(LFSize(1:NDims-1)), 3]);
+LF = reshape(LF, [prod(LFSize(1:end-1)), 3]);
 
-LF = bsxfun(@times, LF, ColBalance);
+LF = LF .* ColBalance;
 LF = LF * ColMatrix;
 
 % Unflatten result
-LF = reshape(LF, [LFSize(1:NDims-1),3]);
+LF = reshape(LF, [LFSize(1:end-1),3]);
 
 % Saturating eliminates some issues with clipped pixels, but is aggressive and loses information
 % todo[optimization]: find a better approach to dealing with saturated pixels
