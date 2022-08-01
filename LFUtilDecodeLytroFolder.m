@@ -487,7 +487,7 @@ function [Success] = ValidateCalibration(CalInfo, RectOptions, LensletGridModel)
     a = CalInfo.LensletGridModel;
     b = LensletGridModel;
     a.Orientation = double(strcmp(a.Orientation, b.Orientation));
-    b.Orientation = true;
+    b.Orientation = double(true);
     FractionalDiff = abs((cell2mat(struct2cell(a)) - cell2mat(struct2cell(b))) ./ cell2mat(struct2cell(a)));
 
     if (~all(FractionalDiff < RectOptions.MaxGridModelDiff))
