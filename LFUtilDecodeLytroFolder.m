@@ -481,14 +481,13 @@ function [CalInfo, RectOptions] = SelectCalibration(LFMetadata, RectOptions, Sup
 end
 
 function [Success] = ValidateCalibration(CalInfo, RectOptions, LensletGridModel)
-    % Fails if both are vertical orientation!
     %---Compare structs
     Success = true;
 
     a = CalInfo.LensletGridModel;
     b = LensletGridModel;
-    a.Orientation = double(strcmp(a.Orientation, 'horz'));
-    b.Orientation = double(strcmp(b.Orientation, 'horz'));
+    a.Orientation = double(strcmp(a.Orientation, b.Orientation));
+    b.Orientation = true;
     FractionalDiff = abs((cell2mat(struct2cell(a)) - cell2mat(struct2cell(b))) ./ cell2mat(struct2cell(a)));
 
     if (~all(FractionalDiff < RectOptions.MaxGridModelDiff))
